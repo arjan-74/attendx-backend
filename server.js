@@ -5,6 +5,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const QRCode = require('qrcode');
+const { Expo } = require('expo-server-sdk');
+const expo = new Expo();
 require('dotenv').config();
 
 const app = express();
@@ -109,6 +111,12 @@ app.post('/api/auth/register', async (req, res) => {
   res.status(201).json({ message: 'Registered!', user: { id: user.id, name, email, role: user.role } });
 });
 
+app.post('/api/auth/push-token', authMiddleware, async (req, res) => {
+  const { pushToken } = req.body;
+  await User.updateOne({ id: req.user.id }, { pushToken });
+  res.json({ message: 'Push token saved' });
+});
+
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   const user = await User.findOne({ id: req.user.id });
   if (!user) return res.status(404).json({ error: 'Not found' });
@@ -176,7 +184,18 @@ app.post('/api/qr/verify', authMiddleware, async (req, res) => {
   });
 
   activeQRTokens = activeQRTokens.filter(t => t.token !== token);
-  const student = await User.findOne({ id: qr.studentId });
+ const student = await User.findOne({ id: qr.studentId });
+  
+  // Send push notification if student has a token
+  if (student.pushToken && Expo.isExpoPushToken(student.pushToken)) {
+    await expo.sendPushNotificationsAsync([{
+      to: student.pushToken,
+      title: '✅ Attendance Marked!',
+      body: `You've been marked present for ${qr.classId}`,
+      data: { classId: qr.classId }
+    }]);
+  }
+
   res.json({ message: 'Attendance recorded!', student: { id: student.id, name: student.name }, classId: qr.classId });
 });
 
