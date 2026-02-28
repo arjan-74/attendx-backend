@@ -218,6 +218,49 @@ app.post('/api/attendance/manual', authMiddleware, async (req, res) => {
   res.status(201).json({ message: 'Marked manually', record });
 });
 
+// ── ADMIN: GET ALL USERS ──────────────────────
+app.get('/api/admin/users', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const users = await User.find({}, '-password');
+  res.json(users);
+});
+
+// ── ADMIN: ADD USER ───────────────────────────
+app.post('/api/admin/users', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const { name, email, password, role } = req.body;
+  if (!name || !email || !password || !role) return res.status(400).json({ error: 'All fields required' });
+  const existing = await User.findOne({ email });
+  if (existing) return res.status(400).json({ error: 'Email already exists' });
+  const hashed = await bcrypt.hash(password, 10);
+  const user = await User.create({ id: uuidv4(), name, email, password: hashed, role });
+  res.status(201).json({ message: 'User created', user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+});
+
+// ── ADMIN: DELETE USER ────────────────────────
+app.delete('/api/admin/users/:userId', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  await User.deleteOne({ id: req.params.userId });
+  res.json({ message: 'User deleted' });
+});
+
+// ── ADMIN: CREATE CLASS ───────────────────────
+app.post('/api/admin/classes', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const { name, room, time, facultyId } = req.body;
+  if (!name || !room || !time) return res.status(400).json({ error: 'Name, room and time required' });
+  const id = name.replace(/\s+/g, '-').toUpperCase().slice(0, 8) + '-' + uuidv4().slice(0, 4);
+  const cls = await Class.create({ id, name, room, time, facultyId: facultyId || '' });
+  res.status(201).json({ message: 'Class created', class: cls });
+});
+
+// ── ADMIN: DELETE CLASS ───────────────────────
+app.delete('/api/admin/classes/:classId', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  await Class.deleteOne({ id: req.params.classId });
+  res.json({ message: 'Class deleted' });
+});
+
 // ── START ─────────────────────────────────────
 app.get('/', (req, res) => res.json({ message: '✅ AttendX API is running!', version: '2.0.0', db: 'MongoDB' }));
 
