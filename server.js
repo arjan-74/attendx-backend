@@ -319,6 +319,20 @@ app.delete('/api/admin/classes/:classId', authMiddleware, async (req, res) => {
 });
 
 // ─── HEALTH CHECK ─────────────────────────────
+app.get('/setup-admin', async (req, res) => {
+  try {
+    await User.deleteMany({ email: 'admin@university.edu' });
+    const hashed = await bcrypt.hash('Admin@1234', 10);
+    await User.create({
+      id: uuidv4(), name: 'Admin User',
+      email: 'admin@university.edu',
+      password: hashed, role: 'admin'
+    });
+    res.json({ success: true, message: 'Admin created! Email: admin@university.edu / Password: Admin@1234' });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
 app.get('/', (req, res) => res.json({ status: 'AttendX backend running' }));
 
 const PORT = process.env.PORT || 5000;
